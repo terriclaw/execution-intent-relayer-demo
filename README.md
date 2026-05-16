@@ -7,6 +7,8 @@ receive it, validate it, submit it, return a receipt.
 
 ---
 
+![relayer demo flow](./assets/relayer-demo-flow.svg)
+
 ## What this is
 
 A tiny local HTTP relayer that:
@@ -14,6 +16,8 @@ A tiny local HTTP relayer that:
 - validates offchain using `execution-intent-sdk`
 - submits valid payloads to a local `MinimalIntentVerifier` contract on Anvil
 - returns structured receipts with status and failure codes
+
+![relayer demo flow](./assets/relayer-demo-flow.svg)
 
 ## What this is not
 

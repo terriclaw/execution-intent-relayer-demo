@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1060 420" width="1060" height="420" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+
+  <!-- Background -->
+  <rect width="1060" height="420" fill="#0d1117" rx="10"/>
+
+  <!-- Title -->
+  <text x="530" y="32" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="700" letter-spacing="0.5">execution-intent-relayer-demo — end-to-end flow</text>
+
+  <!-- ── Actor: Agent/User ── -->
+  <rect x="20" y="55" width="160" height="80" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="100" y="78" text-anchor="middle" fill="#8b949e" font-size="10" font-weight="600" letter-spacing="0.5">AGENT / USER</text>
+  <line x1="40" y1="85" x2="160" y2="85" stroke="#30363d" stroke-width="1"/>
+  <text x="100" y="103" text-anchor="middle" fill="#e6edf3" font-size="11">createIntent()</text>
+  <text x="100" y="121" text-anchor="middle" fill="#e6edf3" font-size="11">signIntent()</text>
+
+  <!-- Step 1 arrow: Agent -> POST /intents -->
+  <line x1="181" y1="95" x2="248" y2="95" stroke="#388bfd" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <polygon points="248,90 258,95 248,100" fill="#388bfd"/>
+  <text x="219" y="88" text-anchor="middle" fill="#388bfd" font-size="9">POST /intents</text>
+
+  <!-- ── Relayer Server ── -->
+  <rect x="260" y="55" width="280" height="270" rx="6" fill="#161b22" stroke="#388bfd" stroke-width="2"/>
+  <rect x="260" y="55" width="280" height="30" rx="6" fill="#1c2d45"/>
+  <rect x="260" y="73" width="280" height="12" rx="0" fill="#1c2d45"/>
+  <text x="400" y="75" text-anchor="middle" fill="#388bfd" font-size="10" font-weight="700" letter-spacing="0.5">RELAYER SERVER  (Hono)</text>
+  <line x1="280" y1="85" x2="520" y2="85" stroke="#388bfd" stroke-width="0.75" opacity="0.4"/>
+
+  <!-- Step boxes inside relayer -->
+  <!-- Step 1 -->
+  <rect x="280" y="98" width="240" height="34" rx="4" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <text x="292" y="112" fill="#8b949e" font-size="9" font-weight="600">1</text>
+  <text x="308" y="112" fill="#e6edf3" font-size="10">Receive signed intent + execution</text>
+  <text x="308" y="125" fill="#6e7681" font-size="9">deserialize bigints, validate shape</text>
+
+  <!-- Step 2 -->
+  <rect x="280" y="140" width="240" height="34" rx="4" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <text x="292" y="154" fill="#8b949e" font-size="9" font-weight="600">2</text>
+  <text x="308" y="154" fill="#e6edf3" font-size="10">verifySignedIntent()</text>
+  <text x="308" y="167" fill="#6e7681" font-size="9">EIP-712 signature check (offchain)</text>
+
+  <!-- Step 3 -->
+  <rect x="280" y="182" width="240" height="34" rx="4" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <text x="292" y="196" fill="#8b949e" font-size="9" font-weight="600">3</text>
+  <text x="308" y="196" fill="#e6edf3" font-size="10">validateBeforeSubmission()</text>
+  <text x="308" y="209" fill="#6e7681" font-size="9">deadline / target / calldata / nonce</text>
+
+  <!-- Reject branch -->
+  <line x1="400" y1="216" x2="400" y2="236" stroke="#f85149" stroke-width="1" stroke-dasharray="3,2"/>
+  <polygon points="395,230 400,240 405,230" fill="#f85149"/>
+  <rect x="305" y="240" width="190" height="22" rx="4" fill="#1a0a0a" stroke="#f85149" stroke-width="1"/>
+  <text x="400" y="255" text-anchor="middle" fill="#f85149" font-size="10">REJECTED — failure codes returned</text>
+  <text x="400" y="270" text-anchor="middle" fill="#6e7681" font-size="9">no tx submitted, gas saved</text>
+
+  <!-- Step 4 -->
+  <rect x="280" y="282" width="240" height="34" rx="4" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <text x="292" y="296" fill="#8b949e" font-size="9" font-weight="600">4</text>
+  <text x="308" y="296" fill="#e6edf3" font-size="10">encodeIntentArgs() → submit tx</text>
+  <text x="308" y="309" fill="#6e7681" font-size="9">walletClient.writeContract()</text>
+
+  <!-- Arrow: Relayer -> Verifier -->
+  <line x1="541" y1="299" x2="608" y2="299" stroke="#3fb950" stroke-width="1.5"/>
+  <polygon points="608,294 618,299 608,304" fill="#3fb950"/>
+  <text x="574" y="292" text-anchor="middle" fill="#3fb950" font-size="9">verifyAndConsume()</text>
+
+  <!-- ── Onchain Verifier ── -->
+  <rect x="620" y="200" width="220" height="190" rx="6" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="730" y="222" text-anchor="middle" fill="#3fb950" font-size="10" font-weight="600" letter-spacing="0.5">ONCHAIN VERIFIER</text>
+  <line x1="640" y1="230" x2="820" y2="230" stroke="#3fb950" stroke-width="0.75" opacity="0.4"/>
+  <text x="730" y="250" text-anchor="middle" fill="#8b949e" font-size="10">MinimalIntentVerifier.sol</text>
+
+  <text x="640" y="275" fill="#6e7681" font-size="9">checks:</text>
+  <text x="640" y="292" fill="#e6edf3" font-size="10">&#8226; EIP-712 signature</text>
+  <text x="640" y="308" fill="#e6edf3" font-size="10">&#8226; nonce not consumed</text>
+  <text x="640" y="324" fill="#e6edf3" font-size="10">&#8226; deadline not expired</text>
+  <text x="640" y="340" fill="#e6edf3" font-size="10">&#8226; exact target / value / calldata</text>
+
+  <text x="730" y="370" text-anchor="middle" fill="#3fb950" font-size="10">&#10003; confirmed</text>
+  <text x="730" y="386" text-anchor="middle" fill="#f85149" font-size="10">&#10007; reverted (replay / mismatch)</text>
+
+  <!-- Receipt back arrow -->
+  <line x1="541" y1="315" x2="560" y2="315" stroke="#30363d" stroke-width="1" stroke-dasharray="3,2"/>
+  <line x1="560" y1="315" x2="560" y2="360" stroke="#30363d" stroke-width="1" stroke-dasharray="3,2"/>
+  <line x1="181" y1="360" x2="560" y2="360" stroke="#30363d" stroke-width="1" stroke-dasharray="3,2"/>
+  <polygon points="186,355 176,360 186,365" fill="#30363d"/>
+  <text x="370" y="375" text-anchor="middle" fill="#6e7681" font-size="9">GET /intents/:id  →  ExecutionReceipt { status, txHash, failureCodes }</text>
+
+  <!-- Anvil badge -->
+  <rect x="620" y="55" width="220" height="50" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="730" y="75" text-anchor="middle" fill="#8b949e" font-size="10" font-weight="600" letter-spacing="0.5">LOCAL CHAIN</text>
+  <text x="730" y="95" text-anchor="middle" fill="#6e7681" font-size="10">Anvil  ·  http://127.0.0.1:8545</text>
+
+  <!-- Anvil -> Verifier arrow -->
+  <line x1="730" y1="105" x2="730" y2="198" stroke="#30363d" stroke-width="1" stroke-dasharray="3,2"/>
+  <polygon points="725,193 730,203 735,193" fill="#30363d"/>
+
+  <!-- Bottom note -->
+  <text x="530" y="408" text-anchor="middle" fill="#6e7681" font-size="10" font-style="italic">The relayer improves UX and efficiency. The onchain verifier is the trust boundary.</text>
+
+</svg>
