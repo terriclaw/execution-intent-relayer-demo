@@ -150,6 +150,8 @@ In a fuller delegated-authority system, receipts would also reference the early 
 
 ### Reverted onchain (replay — nonce already consumed)
 
+Reverted receipts include a real tx hash because the transaction was submitted and mined, but the verifier reverted during execution.
+
     {
       "id": "551dbf40-955f-4add-a64f-efe72a0e905c",
       "status": "reverted",
@@ -161,8 +163,8 @@ In a fuller delegated-authority system, receipts would also reference the early 
       "dataHash": "0xae075f11a95f563eb755a9a26431d11be6b969319478218a289666083ae538b3",
       "nonce": "1",
       "deadline": "1776295484",
-      "txHash": "0x",
-      "blockNumber": "0"
+      "txHash": "0xc2bbe9856dad19acd20e222701d00ec4f4d8a4aad907ccc6f23a71d0e944f926",
+      "blockNumber": "3"
     }
 
 ## API
