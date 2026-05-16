@@ -94,6 +94,7 @@ app.post("/intents", async (c) => {
     const receipt: ExecutionReceipt = {
       ...baseReceipt,
       status:         "rejected",
+      offchainValid:  false,
       failureCodes:   ["INVALID_SIGNATURE"],
       failureReasons: ["Signature verification failed"],
     };
@@ -107,7 +108,8 @@ app.post("/intents", async (c) => {
     const receipt: ExecutionReceipt = {
       ...baseReceipt,
       status:         "rejected",
-      failureCodes:   validation.codes,
+      offchainValid:  false,
+      failureCodes:   validation.codes as any,
       failureReasons: validation.reasons,
     };
     saveReceipt(receipt);
@@ -141,9 +143,10 @@ app.post("/intents", async (c) => {
   const finalStatus = result.reverted ? "reverted" : "confirmed";
   const receipt: ExecutionReceipt = {
     ...baseReceipt,
-    status:      finalStatus,
-    txHash:      result.txHash,
-    blockNumber: result.blockNumber.toString(),
+    status:       finalStatus,
+    offchainValid: true,
+    txHash:       result.txHash,
+    blockNumber:  result.blockNumber.toString(),
   };
   saveReceipt(receipt);
   console.log(`[relayer] ${id} ${finalStatus.toUpperCase()} tx=${result.txHash}`);

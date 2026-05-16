@@ -91,6 +91,27 @@ Key distinction:
 
 ---
 
+## Execution receipts
+
+The relayer stores an `ExecutionReceipt` for every submitted intent.
+
+    Delegation grants authority. Execution intent binds the exact action.
+    Execution receipt records what happened.
+
+A receipt answers:
+- who signed the intent?
+- what exact action was attempted?
+- did offchain validation pass?
+- was a transaction submitted?
+- did the onchain verifier confirm or revert?
+- what failure codes explain rejection?
+
+In this demo, receipts cover the late execution path: signed intent → relayer validation → onchain verifier result.
+
+In a fuller delegated-authority system, receipts would also reference the early permission grant and include scope checks proving the final action stayed inside that grant. That is out of scope for v1.
+
+---
+
 ## API
 
 ### POST /intents

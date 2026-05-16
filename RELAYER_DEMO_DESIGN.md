@@ -172,6 +172,30 @@ The relayer cannot know onchain nonce state without querying the contract.
 
 ---
 
+## Execution receipts
+
+Each submitted intent produces an `ExecutionReceipt` that records the full audit trail:
+
+- `id` — unique receipt identifier
+- `status` — received | rejected | submitted | confirmed | reverted
+- `signer` — address that signed the intent
+- `account` — smart account the execution is authorized for
+- `target / value / dataHash / nonce / deadline` — exact committed action fields
+- `offchainValid` — whether the relayer's preflight checks passed
+- `failureCodes / failureReasons` — structured rejection detail if offchain rejected
+- `txHash / blockNumber` — onchain submission result if submitted
+
+The receipt answers:
+> Who signed it? What exact action was attempted? Did offchain validation pass?
+> Was it submitted? Did the onchain verifier confirm or revert?
+
+Note: in a fuller delegated-authority system, a receipt would also reference the
+early permission grant (delegation) and include scope checks proving the final
+action stayed inside that grant. That is intentionally out of scope for v1.
+The current receipt covers the late execution path only.
+
+---
+
 ## Known limitations
 
 - In-memory only: receipts lost on server restart

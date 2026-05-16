@@ -1,5 +1,4 @@
 // src/types.ts
-import type { SignedIntent } from "execution-intent-sdk";
 
 export type RelayerStatus =
   | "received"
@@ -7,6 +6,51 @@ export type RelayerStatus =
   | "submitted"
   | "confirmed"
   | "reverted";
+
+export type FailureCode =
+  | "INVALID_SIGNATURE"
+  | "DEADLINE_EXPIRED"
+  | "EXECUTION_MISMATCH"
+  | "NONCE_REUSE_RISK"
+  | "MALFORMED_PAYLOAD";
+
+// ExecutionReceipt is the audit object for each submitted intent.
+//
+// It answers:
+//   - who signed the intent?
+//   - what exact action was attempted?
+//   - did offchain validation pass?
+//   - was a transaction submitted?
+//   - did the onchain verifier confirm or revert?
+//   - what failure codes explain rejection?
+//
+// In a fuller delegated-authority system, a receipt would also reference
+// the early permission grant and include scope checks proving the final
+// action stayed inside that grant. That is out of scope for v1.
+
+export interface ExecutionReceipt {
+  // Identity
+  id:       string;
+  status:   RelayerStatus;
+
+  // Intent fields (what was signed)
+  signer:   string;
+  account:  string;
+  target:   string;
+  value:    string;
+  dataHash: string;
+  nonce:    string;
+  deadline: string;
+
+  // Offchain validation result
+  offchainValid?:  boolean;
+  failureCodes?:   FailureCode[];
+  failureReasons?: string[];
+
+  // Onchain submission result
+  txHash?:      string;
+  blockNumber?: string;
+}
 
 export interface RelayerIntentRequest {
   signed: {
@@ -26,20 +70,4 @@ export interface RelayerIntentRequest {
     value:  string;
     data:   string;
   };
-}
-
-export interface ExecutionReceipt {
-  id:              string;
-  status:          RelayerStatus;
-  signer:          string;
-  account:         string;
-  target:          string;
-  value:           string;
-  dataHash:        string;
-  nonce:           string;
-  deadline:        string;
-  failureCodes?:   string[];
-  failureReasons?: string[];
-  txHash?:         string;
-  blockNumber?:    string;
 }
