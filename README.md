@@ -7,6 +7,8 @@ receive it, validate it, submit it, return a receipt.
 
 ---
 
+![relayer demo flow](./assets/relayer-demo-flow.svg)
+
 
 ## What this is
 
