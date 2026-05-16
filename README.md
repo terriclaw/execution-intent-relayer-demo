@@ -46,22 +46,24 @@ The `MinimalIntentVerifier` contract is.
 
 ## How to run
 
-### Prerequisites
-- Node.js 18+
-- Anvil installed (`foundryup`)
-- Two terminals
+### One command
 
-### Terminal 1: Start Anvil
-    anvil
-
-### Terminal 2: Start relayer server
     npm install
     cp .env.example .env
-    # Set RELAYER_PRIVATE_KEY in .env
-    # For local Anvil testing, use account 0: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+    # set RELAYER_PRIVATE_KEY in .env (Anvil account 0 for local testing)
+    npm run demo:local
+
+`demo:local` starts Anvil, starts the relayer server, runs all four demo cases, and cleans up automatically.
+
+### Manual (for development / debugging)
+
+    # Terminal 1
+    anvil
+
+    # Terminal 2
     npm run dev
 
-### Terminal 3 (or same): Run demo
+    # Terminal 3
     npm run demo
 
 ---
@@ -167,6 +169,29 @@ Reverted receipts include a real tx hash because the transaction was submitted a
       "blockNumber": "3"
     }
 
+## Demo cases
+
+Four cases are proven end-to-end:
+
+**Case 1: Valid exact execution inside grant** → `confirmed`
+Signed intent matches execution exactly. All scope checks pass. Onchain verifier confirms.
+
+**Case 2: Mutated calldata** → `rejected` (offchain)
+Relayer detects calldata mismatch before submission. `EXECUTION_MISMATCH`. No tx submitted.
+
+**Case 3: Replay attack** → `reverted` (onchain)
+Passes offchain validation. Onchain verifier rejects — nonce already consumed. Real tx hash returned.
+
+**Case 4: Out-of-scope grant** → `rejected` (offchain)
+Target not in `allowedTargets`. `SCOPE_CHECK_FAILED`. No tx submitted.
+
+Receipt status semantics:
+- `rejected` — no transaction was ever submitted
+- `confirmed` — transaction submitted and accepted by verifier
+- `reverted` — transaction submitted, mined, verifier rejected onchain
+
+---
+
 ## Grant envelopes and scope checks
 
 A `GrantEnvelope` is optional structured metadata that models the early permission envelope. When supplied, the relayer runs scope checks before submission to verify the proposed execution stays inside the declared grant.
@@ -220,6 +245,20 @@ If any scope check fails the relayer rejects offchain with `SCOPE_CHECK_FAILED`.
         { "code": "TARGET_ALLOWED", "pass": false, "detail": "target 0x002 not in allowedTargets" }
       ]
     }
+
+---
+
+## Authority receipt model
+
+| Layer | Demo object | Purpose |
+|---|---|---|
+| Early authority | `GrantEnvelope` | Declares delegate, allowed targets, value cap, expiry |
+| Late action | `SignedIntent` | Binds exact target / value / calldata hash / nonce / deadline |
+| Scope bridge | `ScopeCheck[]` | Checks late action against grant envelope |
+| Enforcement | `MinimalIntentVerifier` | Enforces signature, nonce, deadline, exact execution onchain |
+| Audit output | `ExecutionReceipt` | Records authority context, validation, submission, result |
+
+In this demo, `GrantEnvelope` is structured metadata supplied to the relayer — not a cryptographically verified delegation. Future work is replacing it with a real delegation-framework / ERC-7710-style authority object.
 
 ---
 

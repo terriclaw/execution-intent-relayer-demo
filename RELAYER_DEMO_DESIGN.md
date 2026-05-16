@@ -51,6 +51,39 @@ Reverts on any mismatch, replay, or expiry.
 
 ---
 
+## One-command demo
+
+    npm run demo:local
+
+Starts Anvil, waits for readiness, starts relayer server, waits for readiness, runs all four demo cases, cleans up on exit. No manual process management required.
+
+---
+
+## Four demo cases
+
+| Case | Input | Result | Where caught |
+|---|---|---|---|
+| 1. Valid + in-scope grant | exact match, all scope checks pass | confirmed | onchain verifier |
+| 2. Mutated calldata | execution data differs from signed intent | rejected (EXECUTION_MISMATCH) | relayer offchain |
+| 3. Replay attack | nonce already consumed | reverted | onchain verifier |
+| 4. Out-of-scope grant | target not in allowedTargets | rejected (SCOPE_CHECK_FAILED) | relayer offchain |
+
+---
+
+## Authority receipt model
+
+| Layer | Object | Purpose |
+|---|---|---|
+| Early authority | GrantEnvelope | Declared delegate, targets, value cap, expiry |
+| Late action | SignedIntent | Exact target / value / calldata / nonce / deadline |
+| Scope bridge | ScopeCheck[] | Connects late action to early grant envelope |
+| Enforcement | MinimalIntentVerifier | Onchain signature / nonce / deadline / exact execution |
+| Audit output | ExecutionReceipt | Full record: authority + validation + submission + result |
+
+Current limitation: GrantEnvelope is structured metadata, not a cryptographically verified delegation object. Scope checks are offchain only. The onchain verifier enforces the execution intent, not the grant envelope.
+
+---
+
 ## End-to-end flow
 
     User/Agent

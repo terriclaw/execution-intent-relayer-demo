@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "demo": "tsx src/demo.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo:local": "bash scripts/demo-local.sh"
   },
   "dependencies": {
     "execution-intent-sdk": "^1.0.0",
