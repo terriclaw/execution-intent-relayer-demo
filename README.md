@@ -7,7 +7,6 @@ receive it, validate it, submit it, return a receipt.
 
 ---
 
-![relayer demo flow](./assets/relayer-demo-flow.svg)
 
 ## What this is
 
@@ -17,7 +16,6 @@ A tiny local HTTP relayer that:
 - submits valid payloads to a local `MinimalIntentVerifier` contract on Anvil
 - returns structured receipts with status and failure codes
 
-![relayer demo flow](./assets/relayer-demo-flow.svg)
 
 ## What this is not
 
@@ -70,15 +68,17 @@ The `MinimalIntentVerifier` contract is.
 
 ## What the demo proves
 
-Three cases:
+Four cases:
 
-1. **Valid exact execution** — relayer submits, verifier confirms
+1. **Valid exact execution inside grant** — scope checks pass, relayer submits, verifier confirms
 2. **Mutated calldata** — relayer rejects offchain (EXECUTION_MISMATCH), no tx submitted
-3. **Replay** — relayer submits, verifier reverts (nonce already consumed)
+3. **Replay** — relayer submits, verifier reverts onchain (nonce already consumed), real tx hash returned
+4. **Out-of-scope grant** — relayer rejects offchain (SCOPE_CHECK_FAILED), no tx submitted
 
 Key distinction:
-- The relayer catches obvious mismatches offchain (saves gas, improves UX)
+- The relayer catches mismatches and scope violations offchain (saves gas, improves UX)
 - The onchain verifier is the final enforcement boundary (catches replay, validates signature, enforces exact match)
+- Grant scope checks are offchain demo metadata — not enforced onchain
 
 ---
 
@@ -108,9 +108,9 @@ A receipt answers:
 - did the onchain verifier confirm or revert?
 - what failure codes explain rejection?
 
-In this demo, receipts cover the late execution path: signed intent → relayer validation → onchain verifier result.
+Receipts cover the full pipeline: grant envelope → scope checks → signed intent → relayer validation → onchain verifier result.
 
-In a fuller delegated-authority system, receipts would also reference the early permission grant and include scope checks proving the final action stayed inside that grant. That is out of scope for v1.
+When a `GrantEnvelope` is supplied, the receipt also includes `scopeChecks` and `scopeValid` showing whether the action stayed inside the declared authority envelope.
 
 ---
 
@@ -304,13 +304,17 @@ Get deployed verifier address and chainId.
       "dataHash":       "0x...",
       "nonce":          "1",
       "deadline":       "1234567890",
+      "offchainValid":  true,
       "failureCodes":   ["EXECUTION_MISMATCH"],
       "failureReasons": ["execution does not match signed intent"],
+      "grant":          { ... },
+      "scopeChecks":    [ { "code": "TARGET_ALLOWED", "pass": true } ],
+      "scopeValid":     true,
       "txHash":         "0x...",
       "blockNumber":    "5"
     }
 
-Failure codes: INVALID_SIGNATURE, DEADLINE_EXPIRED, EXECUTION_MISMATCH, NONCE_REUSE_RISK
+Failure codes: INVALID_SIGNATURE, DEADLINE_EXPIRED, EXECUTION_MISMATCH, NONCE_REUSE_RISK, SCOPE_CHECK_FAILED
 
 ---
 
