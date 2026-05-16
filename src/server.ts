@@ -143,10 +143,11 @@ app.post("/intents", async (c) => {
   const finalStatus = result.reverted ? "reverted" : "confirmed";
   const receipt: ExecutionReceipt = {
     ...baseReceipt,
-    status:       finalStatus,
+    status:        finalStatus,
     offchainValid: true,
-    txHash:       result.txHash,
-    blockNumber:  result.blockNumber.toString(),
+    ...(result.txHash      ? { txHash:       result.txHash }                    : {}),
+    ...(result.blockNumber ? { blockNumber:   result.blockNumber.toString() }   : {}),
+    ...(result.revertReason ? { revertReason: result.revertReason }             : {}),
   };
   saveReceipt(receipt);
   console.log(`[relayer] ${id} ${finalStatus.toUpperCase()} tx=${result.txHash}`);

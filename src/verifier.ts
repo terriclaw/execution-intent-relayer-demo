@@ -5,6 +5,7 @@ import {
   createPublicClient,
   createWalletClient,
   http,
+  encodeFunctionData,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
@@ -60,21 +61,39 @@ export async function submitToVerifier(
   execTarget: `0x${string}`,
   execValue:  bigint,
   execData:   `0x${string}`
-): Promise<{ txHash: `0x${string}`; blockNumber: bigint; reverted: boolean }> {
+): Promise<{ txHash?: `0x${string}`; blockNumber?: bigint; reverted: boolean; revertReason?: string }> {
   try {
-    const hash = await walletClient.writeContract({
-      address:      verifier,
+    // Encode calldata and use sendRawTransaction to bypass viem's preflight simulation.
+    // writeContract simulates before sending and throws before submission on revert.
+    // sendRawTransaction submits directly so we always get a real tx hash,
+    // even for txs that revert onchain (e.g. replay / nonce already consumed).
+    const calldata = encodeFunctionData({
       abi:          VERIFIER_ABI,
       functionName: "verifyAndConsume",
-      args: [intent, signer, signature, execTarget, execValue, execData],
+      args:         [intent, signer, signature, execTarget, execValue, execData],
     });
+
+    const nonce    = await publicClient.getTransactionCount({ address: walletClient.account!.address });
+    const gasPrice = await publicClient.getGasPrice();
+
+    const signedTx = await walletClient.signTransaction({
+      to:      verifier,
+      data:    calldata,
+      gas:     200_000n,
+      gasPrice,
+      nonce,
+      chainId: chain.id,
+    });
+
+    const hash = await publicClient.sendRawTransaction({ serializedTransaction: signedTx });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     return {
       txHash:      hash,
       blockNumber: receipt.blockNumber,
       reverted:    receipt.status === "reverted",
     };
-  } catch {
-    return { txHash: "0x", blockNumber: 0n, reverted: true };
+  } catch (e: any) {
+    const revertReason = (e as any)?.shortMessage ?? (e as any)?.message ?? "unknown error";
+    return { reverted: true, revertReason };
   }
 }

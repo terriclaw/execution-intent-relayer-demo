@@ -48,8 +48,9 @@ export interface ExecutionReceipt {
   failureReasons?: string[];
 
   // Onchain submission result
-  txHash?:      string;
-  blockNumber?: string;
+  txHash?:       string;   // present if tx was submitted (confirmed or reverted onchain)
+  blockNumber?:  string;
+  revertReason?: string;   // present if tx failed before reaching the chain
 }
 
 export interface RelayerIntentRequest {
