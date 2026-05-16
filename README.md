@@ -112,6 +112,59 @@ In a fuller delegated-authority system, receipts would also reference the early 
 
 ---
 
+## Example receipts
+
+### Confirmed
+
+    {
+      "id": "f0fac7ad-ce88-46cc-b8af-cce3065bd78d",
+      "status": "confirmed",
+      "offchainValid": true,
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "account": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "target": "0x0000000000000000000000000000000000000001",
+      "value": "0",
+      "dataHash": "0xae075f11a95f563eb755a9a26431d11be6b969319478218a289666083ae538b3",
+      "nonce": "1",
+      "deadline": "1776295484",
+      "txHash": "0x200c79b9526eec171da491d349f0d823d0900b4f8247bcfd31688c72079eae86",
+      "blockNumber": "2"
+    }
+
+### Rejected offchain (calldata mismatch)
+
+    {
+      "id": "a139586e-1266-4b7d-808d-9b6f89863625",
+      "status": "rejected",
+      "offchainValid": false,
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "account": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "target": "0x0000000000000000000000000000000000000001",
+      "value": "0",
+      "dataHash": "0xae075f11a95f563eb755a9a26431d11be6b969319478218a289666083ae538b3",
+      "nonce": "2",
+      "deadline": "1776295484",
+      "failureCodes": ["EXECUTION_MISMATCH"],
+      "failureReasons": ["execution does not match signed intent (target, value, or calldata mismatch)"]
+    }
+
+### Reverted onchain (replay — nonce already consumed)
+
+    {
+      "id": "551dbf40-955f-4add-a64f-efe72a0e905c",
+      "status": "reverted",
+      "offchainValid": true,
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "account": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "target": "0x0000000000000000000000000000000000000001",
+      "value": "0",
+      "dataHash": "0xae075f11a95f563eb755a9a26431d11be6b969319478218a289666083ae538b3",
+      "nonce": "1",
+      "deadline": "1776295484",
+      "txHash": "0x",
+      "blockNumber": "0"
+    }
+
 ## API
 
 ### POST /intents
