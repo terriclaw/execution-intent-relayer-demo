@@ -13,6 +13,7 @@ import {
 } from "execution-intent-sdk";
 import type { SignedIntent } from "execution-intent-sdk";
 import { saveReceipt, getReceipt, allReceipts } from "./store.js";
+import { runScopeChecks, scopeValid as checkScopeValid } from "./scope.js";
 import { getOrDeployVerifier, submitToVerifier, publicClient } from "./verifier.js";
 import type { RelayerIntentRequest, ExecutionReceipt } from "./types.js";
 import { PORT } from "./config.js";
@@ -46,7 +47,7 @@ app.post("/intents", async (c) => {
     return c.json({ error: "Invalid JSON" }, 400);
   }
 
-  const { signed: rawSigned, execution } = body;
+  const { signed: rawSigned, execution, grant } = body;
   if (!rawSigned?.intent || !rawSigned?.signer || !rawSigned?.signature || !execution) {
     return c.json({ error: "Missing required fields" }, 400);
   }
@@ -115,6 +116,40 @@ app.post("/intents", async (c) => {
     saveReceipt(receipt);
     console.log(`[relayer] ${id} REJECTED`, validation.codes);
     return c.json(receipt, 400);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Grant scope checks (if grant supplied)
+  // ---------------------------------------------------------------------------
+  if (grant) {
+    const checks = runScopeChecks(
+      grant,
+      execTarget,
+      execValue,
+      signed.signer,
+      intent.deadline,
+    );
+    const valid = checkScopeValid(checks);
+    if (!valid) {
+      const failed = checks.filter(c => !c.pass);
+      const receipt: ExecutionReceipt = {
+        ...baseReceipt,
+        status:         "rejected",
+        offchainValid:  false,
+        grant,
+        scopeChecks:    checks,
+        scopeValid:     false,
+        failureCodes:   ["SCOPE_CHECK_FAILED"],
+        failureReasons: failed.map(c => c.detail ?? c.code),
+      };
+      saveReceipt(receipt);
+      console.log(`[relayer] ${id} REJECTED scope checks failed:`, failed.map(c => c.code));
+      return c.json(receipt, 400);
+    }
+    // scope valid — attach to base receipt for confirmed/reverted path
+    baseReceipt.grant       = grant;
+    baseReceipt.scopeChecks = checks;
+    baseReceipt.scopeValid  = true;
   }
 
   // ---------------------------------------------------------------------------

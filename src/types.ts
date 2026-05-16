@@ -12,7 +12,35 @@ export type FailureCode =
   | "DEADLINE_EXPIRED"
   | "EXECUTION_MISMATCH"
   | "NONCE_REUSE_RISK"
-  | "MALFORMED_PAYLOAD";
+  | "MALFORMED_PAYLOAD"
+  | "SCOPE_CHECK_FAILED";
+
+export type ScopeCheckCode =
+  | "TARGET_ALLOWED"
+  | "VALUE_WITHIN_LIMIT"
+  | "DEADLINE_WITHIN_GRANT"
+  | "GRANT_NOT_EXPIRED"
+  | "SIGNER_IS_DELEGATE";
+
+// GrantEnvelope models the early permission envelope.
+// In this demo it is structured metadata supplied to the relayer.
+// It is NOT a cryptographically verified delegation-framework grant.
+// Future work: replace with real ERC-7710 / delegation-framework verification.
+export interface GrantEnvelope {
+  id:              string;
+  delegator:       string;
+  delegate:        string;
+  allowedTargets?: `0x${string}`[];
+  maxValue?:       string;          // bigint as decimal string
+  expiry?:         string;          // unix timestamp as decimal string
+  scopeHash?:      `0x${string}`;  // optional hash for future onchain reference
+}
+
+export interface ScopeCheck {
+  code:    ScopeCheckCode;
+  pass:    boolean;
+  detail?: string;
+}
 
 // ExecutionReceipt is the audit object for each submitted intent.
 //
@@ -20,13 +48,14 @@ export type FailureCode =
 //   - who signed the intent?
 //   - what exact action was attempted?
 //   - did offchain validation pass?
+//   - did the action stay inside the declared grant envelope?
 //   - was a transaction submitted?
 //   - did the onchain verifier confirm or revert?
-//   - what failure codes explain rejection?
 //
-// In a fuller delegated-authority system, a receipt would also reference
-// the early permission grant and include scope checks proving the final
-// action stayed inside that grant. That is out of scope for v1.
+// Delegation grants authority.
+// Execution intent binds the exact action.
+// Execution receipt records what happened.
+// Scope checks connect the late action back to the early grant envelope.
 
 export interface ExecutionReceipt {
   // Identity
@@ -47,10 +76,15 @@ export interface ExecutionReceipt {
   failureCodes?:   FailureCode[];
   failureReasons?: string[];
 
+  // Grant envelope and scope checks (optional)
+  grant?:       GrantEnvelope;
+  scopeChecks?: ScopeCheck[];
+  scopeValid?:  boolean;
+
   // Onchain submission result
-  txHash?:       string;   // present if tx was submitted (confirmed or reverted onchain)
+  txHash?:       string;
   blockNumber?:  string;
-  revertReason?: string;   // present if tx failed before reaching the chain
+  revertReason?: string;
 }
 
 export interface RelayerIntentRequest {
@@ -71,4 +105,5 @@ export interface RelayerIntentRequest {
     value:  string;
     data:   string;
   };
+  grant?: GrantEnvelope;
 }

@@ -167,6 +167,62 @@ Reverted receipts include a real tx hash because the transaction was submitted a
       "blockNumber": "3"
     }
 
+## Grant envelopes and scope checks
+
+A `GrantEnvelope` is optional structured metadata that models the early permission envelope. When supplied, the relayer runs scope checks before submission to verify the proposed execution stays inside the declared grant.
+
+    Delegation grants authority. Execution intent binds the exact action.
+    Execution receipt records what happened. Scope checks connect the late
+    action back to the early grant envelope.
+
+**Important:** Grant scope checks in this demo are offchain/demo-only metadata. They are not a substitute for onchain delegation verification. Future work is replacing this with real ERC-7710 / delegation-framework grant verification.
+
+### Example request with grant
+
+    {
+      "signed": { ... },
+      "execution": { "target": "0x001", "value": "0", "data": "0xa9059cbb..." },
+      "grant": {
+        "id":             "grant-001",
+        "delegator":      "0x1111...",
+        "delegate":       "0xf39F...",
+        "allowedTargets": ["0x0000000000000000000000000000000000000001"],
+        "maxValue":       "1000000000000000000",
+        "expiry":         "1778920575"
+      }
+    }
+
+### Example receipt with scope checks
+
+    {
+      "status":      "confirmed",
+      "offchainValid": true,
+      "scopeValid":  true,
+      "scopeChecks": [
+        { "code": "SIGNER_IS_DELEGATE",   "pass": true },
+        { "code": "TARGET_ALLOWED",        "pass": true },
+        { "code": "VALUE_WITHIN_LIMIT",    "pass": true },
+        { "code": "GRANT_NOT_EXPIRED",     "pass": true },
+        { "code": "DEADLINE_WITHIN_GRANT", "pass": true }
+      ]
+    }
+
+### Out-of-scope rejection
+
+If any scope check fails the relayer rejects offchain with `SCOPE_CHECK_FAILED`. No transaction is submitted.
+
+    {
+      "status":      "rejected",
+      "offchainValid": false,
+      "scopeValid":  false,
+      "failureCodes": ["SCOPE_CHECK_FAILED"],
+      "scopeChecks": [
+        { "code": "TARGET_ALLOWED", "pass": false, "detail": "target 0x002 not in allowedTargets" }
+      ]
+    }
+
+---
+
 ## API
 
 ### POST /intents
