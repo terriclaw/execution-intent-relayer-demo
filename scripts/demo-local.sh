@@ -8,6 +8,13 @@ if ! command -v anvil &> /dev/null; then
   exit 1
 fi
 
+# Load .env if present
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+fi
+
 if [ -z "$RELAYER_PRIVATE_KEY" ]; then
   echo "No RELAYER_PRIVATE_KEY set — using Anvil account 0 (local testing only)"
   export RELAYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
