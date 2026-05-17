@@ -15,7 +15,8 @@ import type { SignedIntent } from "execution-intent-sdk";
 import { saveReceipt, getReceipt, allReceipts } from "./store.js";
 import { runScopeChecks, scopeValid as checkScopeValid } from "./scope.js";
 import { getOrDeployVerifier, submitToVerifier, publicClient } from "./verifier.js";
-import type { RelayerIntentRequest, ExecutionReceipt } from "./types.js";
+import { computeIntentHash, computeAuthorityHash, buildVerifierId, computeResultDigest, POLICY_VERSION } from "./receipt.js";
+import type { RelayerIntentRequest, ExecutionReceipt, RelayerStatus } from "./types.js";
 import { PORT } from "./config.js";
 
 const app = new Hono();
@@ -72,17 +73,33 @@ app.post("/intents", async (c) => {
   const execValue  = BigInt(execution.value);
   const execData   = execution.data as `0x${string}`;
 
-  const id = randomUUID();
-  const baseReceipt: ExecutionReceipt = {
-    id,
-    status:   "received",
-    signer:   signed.signer,
+  // Compute authority-binding hashes
+  const intentHash    = computeIntentHash({
     account:  intent.account,
     target:   intent.target,
     value:    intent.value.toString(),
     dataHash: dataHash(intent),
     nonce:    intent.nonce.toString(),
     deadline: intent.deadline.toString(),
+  });
+  const authorityHash = grant ? computeAuthorityHash(grant) : undefined;
+  const vId           = verifierAddress ? buildVerifierId(verifierAddress, 31337) : "unknown";
+
+  const id = randomUUID();
+  const baseReceipt: ExecutionReceipt = {
+    id,
+    status:        "received",
+    signer:        signed.signer,
+    account:       intent.account,
+    target:        intent.target,
+    value:         intent.value.toString(),
+    dataHash:      dataHash(intent),
+    nonce:         intent.nonce.toString(),
+    deadline:      intent.deadline.toString(),
+    intentHash,
+    authorityHash,
+    policyVersion: POLICY_VERSION,
+    verifierId:    vId,
   };
 
   saveReceipt(baseReceipt);
@@ -175,15 +192,23 @@ app.post("/intents", async (c) => {
     execData
   );
 
-  const finalStatus = result.reverted ? "reverted" : "confirmed";
-  const receipt: ExecutionReceipt = {
+  const finalStatus: RelayerStatus = result.reverted ? "reverted" : "confirmed";
+  const partialReceipt = {
     ...baseReceipt,
     status:        finalStatus,
     offchainValid: true,
-    ...(result.txHash      ? { txHash:       result.txHash }                    : {}),
-    ...(result.blockNumber ? { blockNumber:   result.blockNumber.toString() }   : {}),
-    ...(result.revertReason ? { revertReason: result.revertReason }             : {}),
+    ...(result.txHash       ? { txHash:       result.txHash }                  : {}),
+    ...(result.blockNumber  ? { blockNumber:  result.blockNumber.toString() }  : {}),
+    ...(result.revertReason ? { revertReason: result.revertReason }            : {}),
   };
+  const resultDigest = computeResultDigest({
+    intentHash,
+    authorityHash,
+    status:     finalStatus,
+    verifierId: vId,
+    txHash:     result.txHash,
+  });
+  const receipt: ExecutionReceipt = { ...partialReceipt, resultDigest };
   saveReceipt(receipt);
   console.log(`[relayer] ${id} ${finalStatus.toUpperCase()} tx=${result.txHash}`);
 

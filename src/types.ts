@@ -85,6 +85,13 @@ export interface ExecutionReceipt {
   txHash?:       string;
   blockNumber?:  string;
   revertReason?: string;
+
+  // Authority binding — joins intent, authority context, and result
+  intentHash?:    string;   // deterministic hash of intent fields
+  authorityHash?: string;   // hash of supplied GrantEnvelope (not onchain delegation proof)
+  policyVersion?: string;   // version of offchain scope-check policy
+  verifierId?:    string;   // eip155:{chainId}:{verifierAddress}
+  resultDigest?:  string;   // hash of final receipt summary
 }
 
 export interface RelayerIntentRequest {
