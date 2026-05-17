@@ -87,11 +87,15 @@ export interface ExecutionReceipt {
   revertReason?: string;
 
   // Authority binding — joins intent, authority context, and result
-  intentHash?:    string;   // deterministic hash of intent fields
+  intentHash?:    string;   // EIP-712 digest from hashIntent(intent, domain)
   authorityHash?: string;   // hash of supplied GrantEnvelope (not onchain delegation proof)
   policyVersion?: string;   // version of offchain scope-check policy
   verifierId?:    string;   // eip155:{chainId}:{verifierAddress}
   resultDigest?:  string;   // hash of final receipt summary
+
+  // Receipt attestation — relayer signs resultDigest at terminal state
+  receiptSigner?:    string;   // relayer account address
+  receiptSignature?: string;   // EIP-191 signature over resultDigest
 }
 
 export interface RelayerIntentRequest {

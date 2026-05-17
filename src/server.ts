@@ -15,10 +15,19 @@ import {
 import type { SignedIntent } from "execution-intent-sdk";
 import { saveReceipt, getReceipt, allReceipts } from "./store.js";
 import { runScopeChecks, scopeValid as checkScopeValid } from "./scope.js";
-import { getOrDeployVerifier, submitToVerifier, publicClient } from "./verifier.js";
-import { computeSignedIntentDigest, computeAuthorityHash, buildVerifierId, computeResultDigest, POLICY_VERSION } from "./receipt.js";
+import { getOrDeployVerifier, submitToVerifier, publicClient, walletClient } from "./verifier.js";
+import { computeSignedIntentDigest, computeAuthorityHash, buildVerifierId, computeResultDigest, signResultDigest, POLICY_VERSION } from "./receipt.js";
 import type { RelayerIntentRequest, ExecutionReceipt, RelayerStatus } from "./types.js";
 import { PORT } from "./config.js";
+
+// Finalize a terminal receipt: ensure resultDigest, sign it, attach attestation.
+async function finalizeReceipt(receipt: ExecutionReceipt): Promise<ExecutionReceipt> {
+  if (!receipt.resultDigest) return receipt;
+  const digest    = receipt.resultDigest as `0x${string}`;
+  const sig       = await signResultDigest(digest, walletClient);
+  const signer    = walletClient.account?.address ?? "unknown";
+  return { ...receipt, receiptSigner: signer, receiptSignature: sig };
+}
 
 const app = new Hono();
 
@@ -112,9 +121,10 @@ app.post("/intents", async (c) => {
       failureCodes:   ["INVALID_SIGNATURE"],
       failureReasons: ["Signature verification failed"],
     };
-    saveReceipt(receipt);
+    const finalReceipt = await finalizeReceipt({ ...receipt, resultDigest: computeResultDigest({ intentHash, authorityHash, status: "rejected", verifierId: vId }) });
+    saveReceipt(finalReceipt);
     console.log(`[relayer] ${id} REJECTED INVALID_SIGNATURE`);
-    return c.json(receipt, 400);
+    return c.json(finalReceipt, 400);
   }
 
   const validation = validateBeforeSubmission(signed, execTarget, execValue, execData);
@@ -126,9 +136,10 @@ app.post("/intents", async (c) => {
       failureCodes:   validation.codes as any,
       failureReasons: validation.reasons,
     };
-    saveReceipt(receipt);
+    const finalReceipt = await finalizeReceipt({ ...receipt, resultDigest: computeResultDigest({ intentHash, authorityHash, status: "rejected", verifierId: vId }) });
+    saveReceipt(finalReceipt);
     console.log(`[relayer] ${id} REJECTED`, validation.codes);
-    return c.json(receipt, 400);
+    return c.json(finalReceipt, 400);
   }
 
   // ---------------------------------------------------------------------------
@@ -155,9 +166,10 @@ app.post("/intents", async (c) => {
         failureCodes:   ["SCOPE_CHECK_FAILED"],
         failureReasons: failed.map(c => c.detail ?? c.code),
       };
-      saveReceipt(receipt);
+      const finalReceipt = await finalizeReceipt({ ...receipt, resultDigest: computeResultDigest({ intentHash, authorityHash, status: "rejected", verifierId: vId }) });
+      saveReceipt(finalReceipt);
       console.log(`[relayer] ${id} REJECTED scope checks failed:`, failed.map(c => c.code));
-      return c.json(receipt, 400);
+      return c.json(finalReceipt, 400);
     }
     // scope valid — attach to base receipt for confirmed/reverted path
     baseReceipt.grant       = grant;
@@ -204,7 +216,7 @@ app.post("/intents", async (c) => {
     verifierId: vId,
     txHash:     result.txHash,
   });
-  const receipt: ExecutionReceipt = { ...partialReceipt, resultDigest };
+  const receipt = await finalizeReceipt({ ...partialReceipt, resultDigest });
   saveReceipt(receipt);
   console.log(`[relayer] ${id} ${finalStatus.toUpperCase()} tx=${result.txHash}`);
 

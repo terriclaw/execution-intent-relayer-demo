@@ -14,7 +14,7 @@
 // Future work: replace GrantEnvelope with real delegation-framework objects
 // and include authority hash in the onchain-verified payload.
 
-import { keccak256, toHex } from "viem";
+import { keccak256, toHex, recoverMessageAddress } from "viem";
 import { hashIntent } from "execution-intent-sdk";
 import type { ExecutionIntent, IntentDomain } from "execution-intent-sdk";
 import type { GrantEnvelope, ExecutionReceipt } from "./types.js";
@@ -82,4 +82,38 @@ export function computeResultDigest(fields: {
     txHash:        fields.txHash ?? null,
   });
   return keccak256(toHex(summary));
+}
+
+// ---------------------------------------------------------------------------
+// Receipt attestation
+// The relayer signs resultDigest after the receipt reaches a terminal state.
+// This makes the receipt portable and externally verifiable.
+// It proves the relayer attested to the observed result.
+// It does NOT prove the GrantEnvelope was a real verified delegation.
+// ---------------------------------------------------------------------------
+
+export async function signResultDigest(
+  resultDigest: `0x${string}`,
+  walletClient: { signMessage: (args: { message: { raw: `0x${string}` } }) => Promise<`0x${string}`> }
+): Promise<`0x${string}`> {
+  return walletClient.signMessage({ message: { raw: resultDigest } });
+}
+
+export async function verifyReceiptSignature(receipt: {
+  resultDigest?:    string;
+  receiptSigner?:   string;
+  receiptSignature?: string;
+}): Promise<boolean> {
+  if (!receipt.resultDigest || !receipt.receiptSigner || !receipt.receiptSignature) {
+    return false;
+  }
+  try {
+    const recovered = await recoverMessageAddress({
+      message:   { raw: receipt.resultDigest as `0x${string}` },
+      signature: receipt.receiptSignature as `0x${string}`,
+    });
+    return recovered.toLowerCase() === receipt.receiptSigner.toLowerCase();
+  } catch {
+    return false;
+  }
 }

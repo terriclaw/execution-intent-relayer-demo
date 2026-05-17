@@ -250,6 +250,27 @@ If any scope check fails the relayer rejects offchain with `SCOPE_CHECK_FAILED`.
 
 ---
 
+## Receipt attestation
+
+Every terminal receipt is signed by the relayer after reaching its final state.
+
+- `resultDigest` — keccak256 hash binding intentHash + authorityHash + status + verifierId + txHash
+- `receiptSigner` — relayer account address
+- `receiptSignature` — EIP-191 signature over `resultDigest`
+
+Anyone can verify the receipt signature against `receiptSigner` to confirm the relayer attested to the observed result.
+
+    {
+      "status":           "confirmed",
+      "resultDigest":     "0xb8cc62...",
+      "receiptSigner":    "0xf39Fd6...",
+      "receiptSignature": "0x..."
+    }
+
+**Important:** The receipt signature attests to what the relayer observed and returned. It does not prove the supplied `GrantEnvelope` was a real verified delegation. Authority verification remains offchain demo metadata.
+
+---
+
 ## Authority receipt model
 
 | Layer | Demo object | Purpose |

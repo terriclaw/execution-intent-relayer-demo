@@ -10,6 +10,7 @@ import {
   defaultDomain,
 } from "execution-intent-sdk";
 import { privateKeyToAccount } from "viem/accounts";
+import { verifyReceiptSignature } from "./receipt.js";
 
 const PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY as `0x${string}`;
 const SERVER_URL  = `http://localhost:${process.env.PORT ?? 8787}`;
@@ -95,6 +96,9 @@ async function main() {
   console.log("Status:     ", result1.status);
   console.log("scopeValid: ", result1.scopeValid);
   console.log("txHash:     ", result1.txHash?.slice(0, 22) + "...");
+  console.log("  resultDigest:", result1.resultDigest?.slice(0, 22) + "...");
+  const sig1ok = await verifyReceiptSignature(result1);
+  console.log("  receiptSig:  ", sig1ok ? "valid" : "INVALID");
   if (result1.scopeChecks) {
     result1.scopeChecks.forEach((c: any) => console.log(" ", c.pass ? "[pass]" : "[FAIL]", c.code));
   }
@@ -112,6 +116,8 @@ async function main() {
   const result2 = await postIntent(signed2, { target: TARGET, value: 0n, data: MUTATED }, grant);
   console.log("Status:      ", result2.status);
   console.log("Failure codes:", result2.failureCodes);
+  const sig2ok = await verifyReceiptSignature(result2);
+  console.log("  receiptSig:  ", sig2ok ? "valid" : "INVALID");
   console.log();
 
   // ---------------------------------------------------------------------------
@@ -126,6 +132,8 @@ async function main() {
   const result3 = await postIntent(signed3, { target: TARGET, value: 0n, data: CALLDATA }, grant);
   console.log("Status:  ", result3.status);
   console.log("txHash:  ", result3.txHash?.slice(0, 22) + "...");
+  const sig3ok = await verifyReceiptSignature(result3);
+  console.log("  receiptSig: ", sig3ok ? "valid" : "INVALID");
   console.log();
 
   // ---------------------------------------------------------------------------
@@ -147,6 +155,8 @@ async function main() {
   console.log("Status:      ", result4.status);
   console.log("scopeValid:  ", result4.scopeValid);
   console.log("Failure codes:", result4.failureCodes);
+  const sig4ok = await verifyReceiptSignature(result4);
+  console.log("  receiptSig:  ", sig4ok ? "valid" : "INVALID");
   if (result4.scopeChecks) {
     result4.scopeChecks.forEach((c: any) => console.log(" ", c.pass ? "[pass]" : "[FAIL]", c.code, c.detail ? "-" + c.detail : ""));
   }
@@ -158,8 +168,6 @@ async function main() {
   console.log("=== Summary ===");
   console.log("Case 1 (valid + in-scope grant):  ", result1.status, "scopeValid:", result1.scopeValid);
   console.log("Case 2 (mutated calldata):        ", result2.status, result2.failureCodes);
-  console.log("Case 3 (replay):                  ", result3.status);
-  console.log("Case 4 (out-of-scope grant):      ", result4.status, result4.failureCodes);
   console.log();
   console.log("Relayer caught Cases 2 and 4 offchain. Onchain verifier caught Case 3.");
   console.log("The contract is the final enforcement boundary.");
