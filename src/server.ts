@@ -15,6 +15,7 @@ import {
 import type { SignedIntent } from "execution-intent-sdk";
 import { saveReceipt, getReceipt, allReceipts } from "./store.js";
 import { runScopeChecks, scopeValid as checkScopeValid } from "./scope.js";
+import { computeDelegationHash, summarizeDelegation } from "./delegationAdapter.js";
 import { getOrDeployVerifier, submitToVerifier, publicClient, walletClient } from "./verifier.js";
 import { computeSignedIntentDigest, computeAuthorityHash, buildVerifierId, computeResultDigest, signResultDigest, POLICY_VERSION } from "./receipt.js";
 import type { RelayerIntentRequest, ExecutionReceipt, RelayerStatus } from "./types.js";
@@ -58,7 +59,7 @@ app.post("/intents", async (c) => {
     return c.json({ error: "Invalid JSON" }, 400);
   }
 
-  const { signed: rawSigned, execution, grant } = body;
+  const { signed: rawSigned, execution, grant, delegation } = body;
   if (!rawSigned?.intent || !rawSigned?.signer || !rawSigned?.signature || !execution) {
     return c.json({ error: "Missing required fields" }, 400);
   }
@@ -87,7 +88,15 @@ app.post("/intents", async (c) => {
   // intentHash = EIP-712 digest from hashIntent(intent, domain)
   // Same digest the signer signed and the onchain verifier recomputes.
   const intentHash    = computeSignedIntentDigest(intent, domain!);
-  const authorityHash = grant ? computeAuthorityHash(grant) : undefined;
+  const authorityHash = delegation
+    ? computeDelegationHash(delegation)
+    : grant
+    ? computeAuthorityHash(grant)
+    : undefined;
+
+  const authoritySource = delegation ? "delegation-framework" as const
+    : grant ? "grant-envelope" as const
+    : undefined;
   const vId           = verifierAddress ? buildVerifierId(verifierAddress, 31337) : "unknown";
 
   const id = randomUUID();
@@ -103,8 +112,9 @@ app.post("/intents", async (c) => {
     deadline:      intent.deadline.toString(),
     intentHash,
     authorityHash,
-    policyVersion: POLICY_VERSION,
-    verifierId:    vId,
+    policyVersion:  POLICY_VERSION,
+    verifierId:     vId,
+    authoritySource,
   };
 
   saveReceipt(baseReceipt);

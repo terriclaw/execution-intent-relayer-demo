@@ -96,7 +96,13 @@ export interface ExecutionReceipt {
   // Receipt attestation — relayer signs resultDigest at terminal state
   receiptSigner?:    string;   // relayer account address
   receiptSignature?: string;   // EIP-191 signature over resultDigest
+
+  // Authority source — distinguishes demo grant metadata from delegation-framework hash
+  authoritySource?: "grant-envelope" | "delegation-framework";
 }
+
+// Re-export for use in server
+export type { DelegationInput } from "./delegationAdapter.js";
 
 export interface RelayerIntentRequest {
   signed: {
@@ -116,5 +122,6 @@ export interface RelayerIntentRequest {
     value:  string;
     data:   string;
   };
-  grant?: GrantEnvelope;
+  grant?:      GrantEnvelope;
+  delegation?: import("./delegationAdapter.js").DelegationInput;
 }
