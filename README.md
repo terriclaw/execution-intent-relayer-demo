@@ -250,6 +250,35 @@ If any scope check fails the relayer rejects offchain with `SCOPE_CHECK_FAILED`.
 
 ---
 
+## Delegation signature verification
+
+When a `delegation` object is supplied in the request, the relayer:
+
+1. Computes the delegation hash using the same rules as `EncoderLib._getDelegationHash()`
+2. Computes the domain hash matching `DelegationManager.getDomainHash()`
+3. Computes the EIP-712 digest: `keccak256(0x1901 || domainHash || delegationHash)`
+4. Recovers the signer from `delegation.signature`
+5. Compares recovered signer to `delegation.delegator`
+
+If verification fails, the request is rejected offchain with `DELEGATION_SIGNATURE_INVALID`. No transaction is submitted.
+
+Example receipt with verified delegation:
+
+    {
+      "authoritySource":             "delegation-framework",
+      "delegationHash":              "0x2ff3f3f7...",
+      "delegationSignatureVerified": true,
+      "delegationSigner":            "0xf39Fd6..."
+    }
+
+**Scope:**
+- EOA delegators only — ERC-1271 smart-account delegators are not yet supported
+- Signature verification only — caveats are not parsed or enforced
+- No DelegationManager redemption path yet
+- The domain verifying contract must match what was used when the delegation was signed
+
+---
+
 ## Receipt attestation
 
 Every terminal receipt is signed by the relayer after reaching its final state.

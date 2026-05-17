@@ -11,6 +11,9 @@ import {
 } from "execution-intent-sdk";
 import { privateKeyToAccount } from "viem/accounts";
 import { verifyReceiptSignature } from "./receipt.js";
+import { computeDelegationHash, computeDelegationDomainHash } from "./delegationAdapter.js";
+import { keccak256, concat } from "viem";
+import { sign } from "viem/accounts";
 
 const PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY as `0x${string}`;
 const SERVER_URL  = `http://localhost:${process.env.PORT ?? 8787}`;
@@ -29,7 +32,7 @@ const MUTATED = ("0xa9059cbb" +
 
 const TARGET = "0x0000000000000000000000000000000000000001" as `0x${string}`;
 
-async function postIntent(signed: any, execution: any, grant?: any) {
+async function postIntent(signed: any, execution: any, grant?: any, delegation?: any) {
   const res = await fetch(`${SERVER_URL}/intents`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
@@ -52,6 +55,10 @@ async function postIntent(signed: any, execution: any, grant?: any) {
         data:   execution.data,
       },
       ...(grant ? { grant } : {}),
+      ...(delegation ? { delegation: {
+        ...delegation,
+        salt: delegation.salt.toString(),
+      } } : {}),
     }),
   });
   return res.json();
@@ -169,6 +176,66 @@ async function main() {
   console.log("Case 1 (valid + in-scope grant):  ", result1.status, "scopeValid:", result1.scopeValid);
   console.log("Case 2 (mutated calldata):        ", result2.status, result2.failureCodes);
   console.log();
+  // ---------------------------------------------------------------------------
+  // Case 5: Valid delegation signature verified
+  // ---------------------------------------------------------------------------
+  console.log("--- Case 5: Delegation-framework delegation with valid EOA signature ---");
+
+  // Build a delegation-framework delegation
+  const DEMO_DELEGATION_MANAGER = "0x0000000000000000000000000000000000000001" as `0x${string}`;
+  const delegation = {
+    delegate:  account.address,
+    delegator: account.address, // self-delegation for demo simplicity
+    authority: "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" as `0x${string}`,
+    caveats:   [] as any[],
+    salt:      0n,
+  };
+
+  // Compute EIP-712 digest (same as DelegationManager)
+  const delHash    = computeDelegationHash(delegation);
+  const domainHash = computeDelegationDomainHash(31337, DEMO_DELEGATION_MANAGER);
+  const delDigest  = keccak256(concat(["0x1901", domainHash, delHash]));
+
+  // Sign with relayer key (delegator == delegate == account for demo)
+  const delSig = await sign({ hash: delDigest, privateKey: PRIVATE_KEY });
+  const delSigHex = `0x${delSig.r.slice(2)}${delSig.s.slice(2)}${Number(delSig.v).toString(16).padStart(2, "0")}` as `0x${string}`;
+
+  const intent5 = createIntent({
+    account: account.address, target: TARGET, value: 0n,
+    data: CALLDATA, nonce: 5n, deadline,
+  });
+  const signed5 = await signIntent(intent5, domain, PRIVATE_KEY);
+
+  const result5 = await postIntent(signed5, { target: TARGET, value: 0n, data: CALLDATA }, undefined, {
+    ...delegation,
+    signature: delSigHex,
+  });
+
+  console.log("Status:                     ", result5.status);
+  console.log("authoritySource:            ", result5.authoritySource);
+  console.log("delegationSignatureVerified:", result5.delegationSignatureVerified);
+  console.log("delegationHash:             ", result5.delegationHash?.slice(0, 22) + "...");
+  const sig5ok = await verifyReceiptSignature(result5);
+  console.log("receiptSig:                 ", sig5ok ? "valid" : "INVALID");
+  console.log();
+
+  // ---------------------------------------------------------------------------
+  // Case 6: Invalid delegation signature (tampered)
+  // ---------------------------------------------------------------------------
+  console.log("--- Case 6: Tampered delegation signature rejected ---");
+
+  const result6 = await postIntent(signed5, { target: TARGET, value: 0n, data: CALLDATA }, undefined, {
+    ...delegation,
+    salt:      0,
+    signature: "0x" + "ab".repeat(65) as `0x${string}`,
+  });
+
+  console.log("Status:      ", result6.status);
+  console.log("Failure codes:", result6.failureCodes);
+  const sig6ok = await verifyReceiptSignature(result6);
+  console.log("receiptSig:  ", sig6ok ? "valid" : "INVALID");
+  console.log();
+
   console.log("Relayer caught Cases 2 and 4 offchain. Onchain verifier caught Case 3.");
   console.log("The contract is the final enforcement boundary.");
   console.log("Grant scope checks are offchain/demo-only metadata. Not onchain delegation verification.");

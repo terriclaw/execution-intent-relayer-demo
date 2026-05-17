@@ -15,7 +15,7 @@ import {
 import type { SignedIntent } from "execution-intent-sdk";
 import { saveReceipt, getReceipt, allReceipts } from "./store.js";
 import { runScopeChecks, scopeValid as checkScopeValid } from "./scope.js";
-import { computeDelegationHash, summarizeDelegation } from "./delegationAdapter.js";
+import { computeDelegationHash, summarizeDelegation, verifyDelegationSignature } from "./delegationAdapter.js";
 import { getOrDeployVerifier, submitToVerifier, publicClient, walletClient } from "./verifier.js";
 import { computeSignedIntentDigest, computeAuthorityHash, buildVerifierId, computeResultDigest, signResultDigest, POLICY_VERSION } from "./receipt.js";
 import type { RelayerIntentRequest, ExecutionReceipt, RelayerStatus } from "./types.js";
@@ -59,7 +59,11 @@ app.post("/intents", async (c) => {
     return c.json({ error: "Invalid JSON" }, 400);
   }
 
-  const { signed: rawSigned, execution, grant, delegation } = body;
+  const { signed: rawSigned, execution, grant, delegation: rawDelegation } = body;
+  const delegation = rawDelegation ? {
+    ...rawDelegation,
+    salt: BigInt(rawDelegation.salt ?? 0),
+  } : undefined;
   if (!rawSigned?.intent || !rawSigned?.signer || !rawSigned?.signature || !execution) {
     return c.json({ error: "Missing required fields" }, 400);
   }
@@ -97,6 +101,17 @@ app.post("/intents", async (c) => {
   const authoritySource = delegation ? "delegation-framework" as const
     : grant ? "grant-envelope" as const
     : undefined;
+
+  // Phase 2: verify EOA delegation signature if delegation is present
+  let delegationVerification: import("./delegationAdapter.js").DelegationSignatureVerification | undefined;
+  if (delegation && verifierAddress) {
+    delegationVerification = await verifyDelegationSignature({
+      delegation,
+      chainId:           31337,
+      verifyingContract: process.env.DELEGATION_MANAGER_ADDRESS as `0x${string}`
+        ?? "0x0000000000000000000000000000000000000001" as `0x${string}`,
+    });
+  }
   const vId           = verifierAddress ? buildVerifierId(verifierAddress, 31337) : "unknown";
 
   const id = randomUUID();
@@ -115,6 +130,12 @@ app.post("/intents", async (c) => {
     policyVersion:  POLICY_VERSION,
     verifierId:     vId,
     authoritySource,
+    ...(delegationVerification ? {
+      delegationHash:              delegationVerification.delegationHash,
+      delegationSignatureVerified: delegationVerification.valid,
+      delegationSigner:            delegationVerification.recoveredSigner,
+      delegationVerificationError: delegationVerification.error,
+    } : {}),
   };
 
   saveReceipt(baseReceipt);
@@ -149,6 +170,23 @@ app.post("/intents", async (c) => {
     const finalReceipt = await finalizeReceipt({ ...receipt, resultDigest: computeResultDigest({ intentHash, authorityHash, status: "rejected", verifierId: vId }) });
     saveReceipt(finalReceipt);
     console.log(`[relayer] ${id} REJECTED`, validation.codes);
+    return c.json(finalReceipt, 400);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reject if delegation signature invalid
+  // ---------------------------------------------------------------------------
+  if (delegationVerification && !delegationVerification.valid) {
+    const receipt: ExecutionReceipt = {
+      ...baseReceipt,
+      status:         "rejected",
+      offchainValid:  false,
+      failureCodes:   ["DELEGATION_SIGNATURE_INVALID"],
+      failureReasons: [delegationVerification.error ?? "delegation signature verification failed"],
+    };
+    const finalReceipt = await finalizeReceipt({ ...receipt, resultDigest: computeResultDigest({ intentHash, authorityHash, status: "rejected", verifierId: vId }) });
+    saveReceipt(finalReceipt);
+    console.log(`[relayer] ${id} REJECTED DELEGATION_SIGNATURE_INVALID`);
     return c.json(finalReceipt, 400);
   }
 

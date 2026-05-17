@@ -16,7 +16,7 @@
 //   Constants.sol  — DELEGATION_TYPEHASH, CAVEAT_TYPEHASH
 //   Types.sol      — Delegation, Caveat structs
 
-import { keccak256, encodeAbiParameters, encodePacked, parseAbiParameters } from "viem";
+import { keccak256, encodeAbiParameters, encodePacked, parseAbiParameters, recoverAddress, concat } from "viem";
 
 // ---------------------------------------------------------------------------
 // Type definitions mirroring delegation-framework Solidity structs
@@ -156,4 +156,70 @@ export function summarizeDelegation(delegation: DelegationInput): DelegationAuth
     })),
     signaturePresent: !!delegation.signature,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: EOA delegation signature verification
+//
+// Mirrors DelegationManager signature validation (EOA path only):
+//   digest = keccak256(0x1901 || domainHash || delegationHash)
+//   recovered = ECDSA.recover(digest, signature)
+//   valid = recovered == delegation.delegator
+//
+// ERC-1271 smart-account delegators are explicitly out of scope for Phase 2.
+// ---------------------------------------------------------------------------
+
+export interface DelegationSignatureVerification {
+  delegationHash: `0x${string}`;
+  domainHash:     `0x${string}`;
+  digest:         `0x${string}`;
+  recoveredSigner?: `0x${string}`;
+  valid:          boolean;
+  error?:         string;
+}
+
+export async function verifyDelegationSignature(params: {
+  delegation:        DelegationInput;
+  chainId:           number;
+  verifyingContract: `0x${string}`;
+}): Promise<DelegationSignatureVerification> {
+  const { delegation, chainId, verifyingContract } = params;
+
+  const delegationHash = computeDelegationHash(delegation);
+  const domainHash     = computeDelegationDomainHash(chainId, verifyingContract);
+
+  // EIP-712 digest: keccak256(0x1901 || domainHash || delegationHash)
+  const digest = keccak256(
+    concat(["0x1901", domainHash, delegationHash])
+  );
+
+  if (!delegation.signature || delegation.signature === "0x") {
+    return { delegationHash, domainHash, digest, valid: false, error: "no signature provided" };
+  }
+
+  try {
+    const recoveredSigner = await recoverAddress({
+      hash:      digest,
+      signature: delegation.signature,
+    });
+
+    const valid = recoveredSigner.toLowerCase() === delegation.delegator.toLowerCase();
+
+    return {
+      delegationHash,
+      domainHash,
+      digest,
+      recoveredSigner,
+      valid,
+      error: valid ? undefined : `recovered ${recoveredSigner} but expected ${delegation.delegator}`,
+    };
+  } catch (e: any) {
+    return {
+      delegationHash,
+      domainHash,
+      digest,
+      valid:  false,
+      error:  e?.message ?? "signature recovery failed",
+    };
+  }
 }

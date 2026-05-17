@@ -13,7 +13,8 @@ export type FailureCode =
   | "EXECUTION_MISMATCH"
   | "NONCE_REUSE_RISK"
   | "MALFORMED_PAYLOAD"
-  | "SCOPE_CHECK_FAILED";
+  | "SCOPE_CHECK_FAILED"
+  | "DELEGATION_SIGNATURE_INVALID";
 
 export type ScopeCheckCode =
   | "TARGET_ALLOWED"
@@ -99,6 +100,12 @@ export interface ExecutionReceipt {
 
   // Authority source — distinguishes demo grant metadata from delegation-framework hash
   authoritySource?: "grant-envelope" | "delegation-framework";
+
+  // Delegation-framework specific fields (when authoritySource === "delegation-framework")
+  delegationHash?:               string;
+  delegationSignatureVerified?:  boolean;
+  delegationSigner?:             string;
+  delegationVerificationError?:  string;
 }
 
 // Re-export for use in server
