@@ -14,36 +14,24 @@
 // Future work: replace GrantEnvelope with real delegation-framework objects
 // and include authority hash in the onchain-verified payload.
 
-import { keccak256, encodePacked, toHex } from "viem";
+import { keccak256, toHex } from "viem";
+import { hashIntent } from "execution-intent-sdk";
+import type { ExecutionIntent, IntentDomain } from "execution-intent-sdk";
 import type { GrantEnvelope, ExecutionReceipt } from "./types.js";
 
 export const POLICY_VERSION = "demo-scope-v1";
 
 // ---------------------------------------------------------------------------
-// intentHash
-// Deterministic hash of the stable intent fields.
-// NOT the EIP-712 signed digest — that is domain-specific.
-// This is a local receipt-binding hash for audit purposes.
+// intentHash / signed intent digest
+// Uses hashIntent(intent, domain) from execution-intent-sdk.
+// Returns the EIP-712 digest — the same value the signer signed,
+// the SDK verifies, and the onchain verifier recomputes.
 // ---------------------------------------------------------------------------
-export function computeIntentHash(intent: {
-  account:  string;
-  target:   string;
-  value:    string;
-  dataHash: string;
-  nonce:    string;
-  deadline: string;
-}): `0x${string}` {
-  return keccak256(encodePacked(
-    ["address", "address", "uint256", "bytes32", "uint256", "uint256"],
-    [
-      intent.account  as `0x${string}`,
-      intent.target   as `0x${string}`,
-      BigInt(intent.value),
-      intent.dataHash as `0x${string}`,
-      BigInt(intent.nonce),
-      BigInt(intent.deadline),
-    ]
-  ));
+export function computeSignedIntentDigest(
+  intent: ExecutionIntent,
+  domain: IntentDomain,
+): `0x${string}` {
+  return hashIntent(intent, domain);
 }
 
 // ---------------------------------------------------------------------------

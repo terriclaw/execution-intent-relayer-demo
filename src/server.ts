@@ -10,12 +10,13 @@ import {
   encodeIntentArgs,
   dataHash,
   defaultDomain,
+  hashIntent,
 } from "execution-intent-sdk";
 import type { SignedIntent } from "execution-intent-sdk";
 import { saveReceipt, getReceipt, allReceipts } from "./store.js";
 import { runScopeChecks, scopeValid as checkScopeValid } from "./scope.js";
 import { getOrDeployVerifier, submitToVerifier, publicClient } from "./verifier.js";
-import { computeIntentHash, computeAuthorityHash, buildVerifierId, computeResultDigest, POLICY_VERSION } from "./receipt.js";
+import { computeSignedIntentDigest, computeAuthorityHash, buildVerifierId, computeResultDigest, POLICY_VERSION } from "./receipt.js";
 import type { RelayerIntentRequest, ExecutionReceipt, RelayerStatus } from "./types.js";
 import { PORT } from "./config.js";
 
@@ -74,14 +75,9 @@ app.post("/intents", async (c) => {
   const execData   = execution.data as `0x${string}`;
 
   // Compute authority-binding hashes
-  const intentHash    = computeIntentHash({
-    account:  intent.account,
-    target:   intent.target,
-    value:    intent.value.toString(),
-    dataHash: dataHash(intent),
-    nonce:    intent.nonce.toString(),
-    deadline: intent.deadline.toString(),
-  });
+  // intentHash = EIP-712 digest from hashIntent(intent, domain)
+  // Same digest the signer signed and the onchain verifier recomputes.
+  const intentHash    = computeSignedIntentDigest(intent, domain!);
   const authorityHash = grant ? computeAuthorityHash(grant) : undefined;
   const vId           = verifierAddress ? buildVerifierId(verifierAddress, 31337) : "unknown";
 
